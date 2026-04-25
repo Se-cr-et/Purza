@@ -8,3 +8,5 @@
 6. run "./c.exe" in 2nd terminal
 7. send messages to server
 8. to exit, press enter
+
+### Note: Only a single client has been implemented as of right now
