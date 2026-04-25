@@ -2,6 +2,13 @@
 #include <unordered_map>
 #include <iostream>
 
+//FlatVectorStore, stores vectors in a 1d array for cache locality and optimization
+//The fixed dimension for all the vectors allows us to do so
+//As we can find the starting index of a vector by multiplytin its relative position with dimension
+//we keep a store of ids provided by the users in a separate vector in the same relative order as the flat array
+//we also keep a hashmap that maps the id of the vector to its relative position in the flat array
+//when inserting a vector, check its existence using the hashmap, if it already exists then overwrite
+//otherwise push a new vector at the end and update the other data structures accordingly
 class FLatVectorStore
 {
 private:
