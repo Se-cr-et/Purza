@@ -3,12 +3,33 @@
 #include <netinet/in.h>      // Not complete sure yet
 #include <sys/socket.h>      // Not completely sure yet
 #include <unistd.h>          // Not completely sure yet
+#include <thread>
+#include <vector>
 using namespace std;
+
+
+int communication(int ClientSocket){
+    while (true){
+        // Holds the message recieved from the Client, max 1024 char size
+        char buffer[1024] = {0};
+
+        // Recieves message from client
+        recv(ClientSocket, buffer, sizeof(buffer), 0);
+
+        // If no message, exit loop
+        if (strlen(buffer) == 0){
+            break;
+        }
+        cout << "Message from Client " << ClientSocket << ": " << buffer << endl;
+    }
+    return -1;
+}
 
 
 int main(){
 
     // Creating a server socket
+    int max = 5;
     int ServerSocket = socket(AF_INET, SOCK_STREAM, 0);
 
     // Initializing the Server Address and Type
@@ -22,26 +43,33 @@ int main(){
     cout << "Listening..." << endl;
 
     // Waits/Listens for connections
-    listen(ServerSocket, 5);
+    listen(ServerSocket, max);
 
-    // Once a connection request arrives, accept it
-    // and store it in ClientSocket
-    int ClientSocket = accept(ServerSocket, nullptr, nullptr);
-    cout << "Connected with: " << ClientSocket << endl;
-
+    int i = 0;
+    vector<thread*> Threads;
     while (true){
-        // Holds the message recieved from the Client, max 1024 char size
-        char buffer[1024] = {0};
+        // Accept connections from the Queue [Listen function holds the Queue]
+        int ClientSocket = accept(ServerSocket, nullptr, nullptr);
+        cout << "Connected with: " << ClientSocket << endl;
 
-        // Recieves message from client
-        recv(ClientSocket, buffer, sizeof(buffer), 0);
+        // Has max connections been created ?
+        if (i <= max){
+            // Create a thread for every new connection
+            thread T(communication, ClientSocket);
 
-        // If no message, exit loop
-        if (strlen(buffer) == 0){
-            break;
+            // Detach, so that the thread stops on its own
+            T.detach();
+
+            // Store the thread in the vector
+            Threads.push_back(&T);
+            i++;
         }
-        cout << "Message from Client: " << buffer << endl;
+        else{
+            cout << "Max Connections Reached" << endl;
+        }
+
     }
+
 
     cout << "Connection has been closed" << endl;
 
