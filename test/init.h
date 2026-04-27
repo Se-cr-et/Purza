@@ -2,6 +2,10 @@
 #include <unordered_map>
 #include <iostream>
 
+//The flat vector store class stores vectors of a fixed dimension Din a flat array
+//This is done so for cache locality and efficient storage
+//The vector of ids is kept to maintain the relative position of that vector in the array
+//The hashmap is kept for fast access to get the vector of a particular id, as it maps id to relative pos
 class FLatVectorStore
 {
 private:
