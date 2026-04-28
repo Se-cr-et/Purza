@@ -1,6 +1,7 @@
 #include <iostream>
 #include <thread>
 #include <mutex>
+#include <vector>
 using namespace std;
 
 mutex mtx;
@@ -15,6 +16,46 @@ void inc()
     mtx.unlock(); // release the lock
 }
 
+void parser()
+{
+    string word, mode;
+    vector<int> vec;
+    int num, k, id;
+
+    cin >> word;
+
+    if (word == "SEARCH")
+    {
+        cin >> id;
+
+        while (cin >> num)
+        {
+            vec.push_back(num);
+        }
+    }
+    else if (word == "ADD")
+    {
+        while (cin >> num)
+        {
+            vec.push_back(num);
+        }
+
+        cin >> k;
+        cin >> mode;
+    }
+    else if (word == "STATS")
+    {
+        // stats logic
+    }
+    else if (word == "QUIT")
+    {
+        // disconnect the client
+    }
+    else
+    {
+        cout << "Invalid command" << endl;
+    }
+}
 int main()
 {
     thread t1(inc);
