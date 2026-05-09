@@ -41,16 +41,26 @@ int main()
 
     cout << "\nRunning llyods algorithm..." << endl;
 
-    int k = 2;
-    vector<vector<float>> centroids = v.llyods_algorithm(k);
+    int k = 2, dim = v.get_dim();
+    vector<vector<int>> vectors_cluster_id(k);
+    vector<float> centroids = v.llyods_algorithm(k, vectors_cluster_id);
 
     for (int i = 0; i < k; i++)
     {
-        for (int j = 0; j < centroids[i].size(); j++)
+        cout << "Cluster " << i << " coordinates : ";
+        for (int j = 0; j < dim; j++)
         {
-            cout << centroids[i][j] << " ";
+            cout << centroids[(i * dim) + j] << " ";
+        }
+        cout << endl;
+
+        cout << "Cluster vectors ID: ";
+        for (int l = 0; l < vectors_cluster_id[i].size(); l++)
+        {
+            cout << vectors_cluster_id[i][l] << " ";
         }
         cout << endl;
     }
+
     return 0;
 }

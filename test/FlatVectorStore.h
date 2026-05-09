@@ -143,7 +143,7 @@ public:
         }
         return true;
     }
-    vector<vector<float>> llyods_algorithm(int k)
+    vector<float> llyods_algorithm(int k, vector<vector<int>> &vectors_cluster_id)
     {
         int number = ids.size();
         vector<float> centroids(k * dimension);    // stores centroid coordinates
@@ -223,16 +223,17 @@ public:
             }
         }
 
-        vector<vector<float>> clusters_centroid(k, vector<float>(dimension));
-
         for (int i = 0; i < k; i++)
         {
-            for (int j = 0; j < dimension; j++)
+            for (int j = 0; j < number; j++)
             {
-                clusters_centroid[i][j] = centroids[i * dimension + j];
+                if (i == vector_cluster_id[j])
+                {
+                    vectors_cluster_id[i].push_back(j); // storing integer index of a vector
+                }
             }
         }
 
-        return clusters_centroid;
+        return centroids;
     }
 };
