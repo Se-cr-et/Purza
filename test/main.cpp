@@ -40,27 +40,22 @@ int main()
     }
 
     cout << "\nRunning llyods algorithm..." << endl;
-
-    int k = 2, dim = v.get_dim();
+    int K = 1, k = 2, dim = v.get_dim();
     vector<vector<int>> vectors_cluster_id(k);
-    vector<float> centroids = v.llyods_algorithm();
+    v.llyods_algorithm();
+    v.Cluster();
 
-    for (int i = 0; i < k; i++)
-    {
-        cout << "Cluster " << i << " coordinates : ";
-        for (int j = 0; j < dim; j++)
-        {
-            cout << centroids[(i * dim) + j] << " ";
-        }
-        cout << endl;
-
-        cout << "Cluster vectors ID: ";
-        for (int l = 0; l < vectors_cluster_id[i].size(); l++)
-        {
-            cout << vectors_cluster_id[i][l] << " ";
-        }
+    cout << endl;
+    vector<vector<float>> nearest;
+    nearest = v.IVF(K,k,t);
+    cout << nearest.size() << endl;
+    for (int i = 0; i < k; i++){
+        cout << nearest[0].back() << ":" << nearest[1].back();
+        nearest[0].pop_back();
+        nearest[1].pop_back();
         cout << endl;
     }
+    cout << endl;
 
     return 0;
 }

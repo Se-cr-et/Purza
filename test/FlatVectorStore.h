@@ -162,10 +162,12 @@ public:
     }
     vector<float> llyods_algorithm()
     {
+        cout << "I was here 1" << endl;
         int number = ids.size();
         int k = sqrt(number);
         centroids = vector<float>(k*dimension);    // stores centroid coordinates
         vector<int> vector_cluster_id(number, -1); // stores the cluster index of vectors
+        cout << "I was here 2" << endl;
 
         // picking k initial centroids
         for (int i = 0; i < k; i++)
@@ -176,7 +178,7 @@ public:
                 centroids[i * dimension + j] = vectors[random_position * dimension + j];
             }
         }
-
+        cout << "I was here 3" << endl;
         const float *v = vectors.data();
 
         for (int iteration = 0; iteration < 50; iteration++)
@@ -240,7 +242,9 @@ public:
                 }
             }
         }
+        cout << "I was here 4" << endl;
 
+        vectors_cluster_id = vector<vector<int>>(k);
         for (int i = 0; i < k; i++)
         {
             for (int j = 0; j < number; j++)
@@ -251,21 +255,20 @@ public:
                 }
             }
         }
-
+        cout << "I was here 5" << endl;
         return centroids;
     }
 
 
-    vector<cmp_dist> IVF(int nprobe, int k, vector<float> target){
+    vector<vector<float>> IVF(int nprobe, int k, vector<float> target){
         priority_queue<cmp_dist> Max_Centroid;
         int K = vectors_cluster_id.size(); // Number of Centroids
 
-
+        float *c = centroids.data();
         for (int i = 0; i < K; i++){
-            float *v = vectors.data();
             float *t = target.data();
-            int distance = distance_sq(t, v);
-            v += 4;
+            float distance = distance_sq(t, c);
+            c += dimension;
             if (Max_Centroid.size() <= nprobe){
                 Max_Centroid.push(cmp_dist(i,distance));
             }
@@ -274,6 +277,7 @@ public:
                 Max_Centroid.push(cmp_dist(i,distance));
             }
         }
+        Max_Centroid.pop();
 
         priority_queue<cmp_dist> Top_k;
         for (int i = 0; i < nprobe; i++){
@@ -285,24 +289,47 @@ public:
             for (int j = 0; j < ClusterCount; j++){
                 int VectorID = vectors_cluster_id[CentroidID][j];
                 int offset = dimension*VectorID;
-                int distance = distance_sq(t, v+offset);
+                float distance = distance_sq(t, v+offset);
                 if (Top_k.size() <= k){
-                    Top_k.push(cmp_dist(i,distance));
+                    Top_k.push(cmp_dist(VectorID,distance));
                 }
                 else{
                     Top_k.pop();
-                    Top_k.push(cmp_dist(i,distance));
+                    Top_k.push(cmp_dist(VectorID,distance));
                 }
             }
         }
+        Top_k.pop();
 
 
-        vector<cmp_dist> nearest;
-        for (int i = 0; i < Top_k.size(); i++){
-            nearest.push_back(Top_k.top());
+        vector<vector<float>> nearest(2);
+
+        for (int i = 0; i < k; i++){
+            nearest[0].push_back(Top_k.top().id);
+            nearest[1].push_back(Top_k.top().dist);
             Top_k.pop();
         }
 
         return nearest;
+    }
+
+
+    void Cluster(){
+        for (int i = 0; i < vectors_cluster_id.size(); i++)
+        {
+            cout << "Cluster " << i << " coordinates : " << endl;
+            for (int j = 0; j < dimension; j++)
+            {
+                cout << centroids[(i * dimension) + j] << " " << endl;
+            }
+            cout << endl;
+
+            cout << "Cluster vectors ID: " << endl;
+            for (int l = 0; l < vectors_cluster_id[i].size(); l++)
+            {
+                cout << vectors_cluster_id[i][l] << " ";
+            }
+            cout << endl;
+        }
     }
 };
