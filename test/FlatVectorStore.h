@@ -3,6 +3,7 @@
 #include <iostream>
 #include <queue>
 #include <algorithm>
+#include <cmath>
 using namespace std;
 
 // The flat vector store class stores vectors of a fixed dimension Din a flat array
@@ -16,6 +17,10 @@ private:
     std::vector<float> vectors;
     std::vector<long long> ids;                         // stores the id for the vector at ith pos
     std::unordered_map<long long, long long> id_to_pos; // maps id to the pos of the vector
+
+    vector<float> centroids;                            // stores centroid coordinates
+    vector<vector<int>> vectors_cluster_id;             // outer vector is clusters, inner vector stores vector index
+
     float distance_sq(const float *a, const float *b)
     {
         // distance function uses euclidean distance but doesnt take underroot as relative values stay the same
@@ -34,6 +39,18 @@ private:
             return p1.second < p2.second;
         }
     };
+
+    struct cmp_dist{
+        long long id;
+        float dist;
+
+        cmp_dist(long long i, float d) : id(i), dist(d){}
+
+        bool operator<(const cmp_dist& Other) const{
+            return dist < Other.dist;
+        }
+    };
+
 
 public:
     FLatVectorStore(const int dim) : dimension(dim) {}
@@ -143,10 +160,11 @@ public:
         }
         return true;
     }
-    vector<float> llyods_algorithm(int k, vector<vector<int>> &vectors_cluster_id)
+    vector<float> llyods_algorithm()
     {
         int number = ids.size();
-        vector<float> centroids(k * dimension);    // stores centroid coordinates
+        int k = sqrt(number);
+        centroids = vector<float>(k*dimension);    // stores centroid coordinates
         vector<int> vector_cluster_id(number, -1); // stores the cluster index of vectors
 
         // picking k initial centroids
@@ -235,5 +253,56 @@ public:
         }
 
         return centroids;
+    }
+
+
+    vector<cmp_dist> IVF(int nprobe, int k, vector<float> target){
+        priority_queue<cmp_dist> Max_Centroid;
+        int K = vectors_cluster_id.size(); // Number of Centroids
+
+
+        for (int i = 0; i < K; i++){
+            float *v = vectors.data();
+            float *t = target.data();
+            int distance = distance_sq(t, v);
+            v += 4;
+            if (Max_Centroid.size() <= nprobe){
+                Max_Centroid.push(cmp_dist(i,distance));
+            }
+            else{
+                Max_Centroid.pop();
+                Max_Centroid.push(cmp_dist(i,distance));
+            }
+        }
+
+        priority_queue<cmp_dist> Top_k;
+        for (int i = 0; i < nprobe; i++){
+            int CentroidID = Max_Centroid.top().id;
+            int ClusterCount = vectors_cluster_id[CentroidID].size();
+            float *v = vectors.data();
+            float *t = target.data();
+            Max_Centroid.pop();
+            for (int j = 0; j < ClusterCount; j++){
+                int VectorID = vectors_cluster_id[CentroidID][j];
+                int offset = dimension*VectorID;
+                int distance = distance_sq(t, v+offset);
+                if (Top_k.size() <= k){
+                    Top_k.push(cmp_dist(i,distance));
+                }
+                else{
+                    Top_k.pop();
+                    Top_k.push(cmp_dist(i,distance));
+                }
+            }
+        }
+
+
+        vector<cmp_dist> nearest;
+        for (int i = 0; i < Top_k.size(); i++){
+            nearest.push_back(Top_k.top());
+            Top_k.pop();
+        }
+
+        return nearest;
     }
 };

@@ -43,7 +43,7 @@ int main()
 
     int k = 2, dim = v.get_dim();
     vector<vector<int>> vectors_cluster_id(k);
-    vector<float> centroids = v.llyods_algorithm(k, vectors_cluster_id);
+    vector<float> centroids = v.llyods_algorithm();
 
     for (int i = 0; i < k; i++)
     {
