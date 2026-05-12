@@ -1,9 +1,12 @@
+#pragma once
+
 #include <vector>
 #include <unordered_map>
 #include <iostream>
 #include <queue>
 #include <algorithm>
 #include <cmath>
+#include <unordered_set>
 using namespace std;
 
 // The flat vector store class stores vectors of a fixed dimension Din a flat array
@@ -39,7 +42,6 @@ private:
             return p1.second < p2.second;
         }
     };
-
     struct cmp_dist{
         long long id;
         float dist;
@@ -162,23 +164,23 @@ public:
     }
     vector<float> llyods_algorithm()
     {
-        cout << "I was here 1" << endl;
         int number = ids.size();
         int k = sqrt(number);
         centroids = vector<float>(k*dimension);    // stores centroid coordinates
         vector<int> vector_cluster_id(number, -1); // stores the cluster index of vectors
-        cout << "I was here 2" << endl;
 
         // picking k initial centroids
-        for (int i = 0; i < k; i++)
-        {
+        unordered_set<int> picked;
+        while (picked.size() < k) {
             int random_position = rand() % number;
-            for (int j = 0; j < dimension; j++)
-            {
-                centroids[i * dimension + j] = vectors[random_position * dimension + j];
+            if (picked.insert(random_position).second) {
+                int i = picked.size() - 1;
+                for (int j = 0; j < dimension; j++) {
+                    centroids[i * dimension + j] = vectors[random_position * dimension + j];
+                }
             }
         }
-        cout << "I was here 3" << endl;
+
         const float *v = vectors.data();
 
         for (int iteration = 0; iteration < 50; iteration++)
@@ -242,8 +244,6 @@ public:
                 }
             }
         }
-        cout << "I was here 4" << endl;
-
         vectors_cluster_id = vector<vector<int>>(k);
         for (int i = 0; i < k; i++)
         {
@@ -255,10 +255,8 @@ public:
                 }
             }
         }
-        cout << "I was here 5" << endl;
         return centroids;
     }
-
 
     vector<vector<float>> IVF(int nprobe, int k, vector<float> target){
         priority_queue<cmp_dist> Max_Centroid;
@@ -312,8 +310,6 @@ public:
 
         return nearest;
     }
-
-
     void Cluster(){
         for (int i = 0; i < vectors_cluster_id.size(); i++)
         {
