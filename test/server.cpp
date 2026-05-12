@@ -45,7 +45,7 @@ int communication(int ClientSocket, Threader &T)
     {
         // Holds the message recieved from the Client, max 1024 char size
         char buffer[1024] = {0};
-        char command[6] = {0};
+        char command[7] = {0};
 
         // Recieves message from client
         recv(ClientSocket, buffer, sizeof(buffer), 0);
@@ -74,6 +74,9 @@ int communication(int ClientSocket, Threader &T)
                 tok = strtok(NULL, " ");
             }
 
+            // [IMPLEMENT ADD FUNCTIONALITY HERE]
+            // vector variable contains the vector, with the first index containing id
+
             cout << "IN ADD" << endl;
         }
         else if (!(strncmp(command, "SEARCH", 6)))
@@ -88,55 +91,69 @@ int communication(int ClientSocket, Threader &T)
             bool IVF_Flag = false;
             while (tok != NULL)
             {
-                // if (i <= dimension + 1)
-                // {
-                //     vector.push_back(stoi(tok));
-                // }
-                // else if (!(strncmp(tok, "BRUTE", 6)))
-                // {
-                //     // Doesnt do anything right now, but its here for future error handling
-                // }
-                // else if (!(strncmp(tok, "IVF", 3)))
-                // {
-                //     IVF_Flag = true;
-                //     tok = strtok(NULL, " ");
-                //     nprobe = stoi(tok);
-                // }
-                // else
-                // {
-                // }
+                if (i <= dimension)
+                {
+                    vector.push_back(stoi(tok));
+                }
+                else if (!(strncmp(tok, "BRUTE", 6)))
+                {
+                    // Doesnt do anything right now, but its here for future error handling
+                }
+                else if (!(strncmp(tok, "IVF", 3)))
+                {
+                    IVF_Flag = true;
+                    tok = strtok(NULL, " ");
+                    nprobe = stoi(tok);
+                }
+                else
+                {
+                }
 
-                // i++;
-                // cout << "COW:" << i << endl;
-                // tok = strtok(NULL, " ");
-                cout << tok;
+                i++;
                 tok = strtok(NULL, " ");
             }
+
+            if (IVF_Flag){
+                // [IMPLEMENT IVF FUNCTIONALITY HERE]
+                // vector variable contains the vector, with the last index containing k (top k). For nprobe, use nprobe variable
+            }
+            else{
+                // [IMPLEMENT BRUTE FUNCTIONALITY HERE]
+                // vector variable contains the vector, with the last index containing k (top k). 
+            }
+
 
             cout << "IN SEARCH" << nprobe << endl;
         }
         else if (!(strncmp(command, "BUILD", 5)))
         {
+
+            // [IMPLEMENT BUILD FUNCTIONALITY HERE]
             cout << "IN BUILD" << endl;
         }
         else if (!(strncmp(command, "STATS", 5)))
         {
+            // [IMPLEMENT STATS FUNCTIONALITY HERE]
             cout << "IN STATS" << endl;
         }
         else if (!(strncmp(command, "SAVE", 4)))
         {
+            // [IMPLEMENT SAVE FUNCTIONALITY HERE]
             cout << "IN SAVE" << endl;
         }
         else if (!(strncmp(command, "LOAD", 4)))
         {
+            // [IMPLEMENT LOAD FUNCTIONALITY HERE]
             cout << "IN LOAD" << endl;
         }
         else if (!(strncmp(command, "QUIT", 4)))
         {
+            // [IMPLEMENT QUIT FUNCTIONALITY HERE]
             cout << "IN QUIT" << endl;
         }
         else
         {
+            // For Errors
         }
 
         if (!(cmd_index == strlen(buffer)))
@@ -164,10 +181,6 @@ void accept_cli(int Server, int max, Threader &Thread)
             // Create a thread for every new connection
             Thread.insert(communication, ClientSocket, Thread);
             init_flag = false;
-
-            // Detach, so that the thread stops on its own
-
-            // Store the thread in the vector
         }
         else
         {
