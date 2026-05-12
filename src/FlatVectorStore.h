@@ -22,7 +22,7 @@ private:
     std::unordered_map<long long, long long> id_to_pos; // maps id to the pos of the vector
 
     vector<float> centroids;                            // stores centroid coordinates
-    vector<vector<int>> vectors_cluster_id;             // outer vector is clusters, inner vector stores vector index
+    vector<vector<long long>> vectors_cluster_id;             // outer vector is clusters, inner vector stores vector index
 
     float distance_sq(const float *a, const float *b)
     {
@@ -164,15 +164,15 @@ public:
     }
     vector<float> llyods_algorithm()
     {
-        int number = ids.size();
-        int k = sqrt(number);
+        long long number = ids.size();
+        long long k = sqrt(number);
         centroids = vector<float>(k*dimension);    // stores centroid coordinates
         vector<int> vector_cluster_id(number, -1); // stores the cluster index of vectors
 
         // picking k initial centroids
         unordered_set<int> picked;
         while (picked.size() < k) {
-            int random_position = rand() % number;
+            long long random_position = rand() % number;
             if (picked.insert(random_position).second) {
                 int i = picked.size() - 1;
                 for (int j = 0; j < dimension; j++) {
@@ -188,7 +188,7 @@ public:
             bool update_happened = false;
 
             // Assignment step
-            for (int i = 0; i < number; i++)
+            for (long long i = 0; i < number; i++)
             {
                 int min_distance = __INT_MAX__;
                 int cluster_id = 0;
@@ -217,11 +217,11 @@ public:
                 break;
 
             // Recompute Centrouds
-            vector<int> sum(k * dimension, 0);  // stores sum of centroid coordinates
+            vector<float> sum(k * dimension, 0);  // stores sum of centroid coordinates
             vector<int> count_of_vectors(k, 0); // stores number of vectors in ith cluster
 
             // computing sum of all the clusters
-            for (int j = 0; j < number; j++)
+            for (long long j = 0; j < number; j++)
             {
                 int cluster = vector_cluster_id[j];
                 count_of_vectors[cluster]++;
@@ -240,20 +240,14 @@ public:
 
                 for (int dim = 0; dim < dimension; dim++)
                 {
-                    centroids[j * dimension + dim] = sum[j * dimension + dim] / count_of_vectors[j];
+                    centroids[j * dimension + dim] = sum[j * dimension + dim] / (float)count_of_vectors[j];
                 }
             }
         }
-        vectors_cluster_id = vector<vector<int>>(k);
-        for (int i = 0; i < k; i++)
+        vectors_cluster_id = vector<vector<long long>>(k);
+        for (long long i = 0; i < number; i++)
         {
-            for (int j = 0; j < number; j++)
-            {
-                if (i == vector_cluster_id[j])
-                {
-                    vectors_cluster_id[i].push_back(j); // storing integer index of a vector
-                }
-            }
+            vectors_cluster_id[vector_cluster_id[i]].push_back(i); // storing integer index of a vector
         }
         return centroids;
     }
