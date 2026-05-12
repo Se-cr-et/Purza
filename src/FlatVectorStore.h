@@ -251,7 +251,6 @@ public:
         }
         return centroids;
     }
-
     vector<vector<float>> IVF(int nprobe, int k, vector<float> target){
         priority_queue<cmp_dist> Max_Centroid;
         int K = vectors_cluster_id.size(); // Number of Centroids
@@ -265,8 +264,11 @@ public:
                 Max_Centroid.push(cmp_dist(i,distance));
             }
             else{
-                Max_Centroid.pop();
-                Max_Centroid.push(cmp_dist(i,distance));
+                if (distance < Max_Centroid.top().dist)
+                {
+                    Max_Centroid.pop();
+                    Max_Centroid.push(cmp_dist(i,distance));
+                }
             }
         }
         Max_Centroid.pop();
@@ -317,7 +319,7 @@ public:
             cout << "Cluster vectors ID: " << endl;
             for (int l = 0; l < vectors_cluster_id[i].size(); l++)
             {
-                cout << vectors_cluster_id[i][l] << " ";
+                cout << ids[vectors_cluster_id[i][l]] << " ";
             }
             cout << endl;
         }
