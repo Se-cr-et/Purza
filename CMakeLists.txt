@@ -4,14 +4,19 @@ project(Purza)
 set(CMAKE_CXX_STANDARD 17)
 include_directories(include)
 
-# 1. THE MAIN APPLICATION
-# This builds the actual program using files in src
-file(GLOB_RECURSE APP_SOURCES "src/*.cpp")
-add_executable(Purza ${APP_SOURCES})
+# --- 1. CORE LOGIC (No main functions here) ---
+set(PURZA_LOGIC
+        src/parser.cpp
+        # src/FlatVectorStore.cpp  <-- Add this if it exists
+)
 
-# 2. THE TEST EXECUTABLE
-# This builds a separate program specifically for testing
-file(GLOB_RECURSE TEST_SOURCES "test/main.cpp")
-# We usually link the src files to the test too, so the test can actually
-# call functions defined in your src folder.
-add_executable(Purza_Test ${TEST_SOURCES} ${APP_SOURCES})
+# --- 2. THE MAIN APPLICATIONS ---
+# Each of these has its own main()
+add_executable(Purza src/main.cpp ${PURZA_LOGIC})
+
+# --- 3. THE TEST EXECUTABLE ---
+# Link the test file + the core logic only
+add_executable(Purza_Test
+        test/main.cpp
+        ${PURZA_LOGIC}
+)
