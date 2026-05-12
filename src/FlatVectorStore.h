@@ -295,12 +295,11 @@ public:
         }
         Top_k.pop();
 
-
-        vector<vector<float>> nearest(2);
-
-        for (int i = 0; i < k; i++){
-            nearest[0].push_back(Top_k.top().id);
-            nearest[1].push_back(Top_k.top().dist);
+        int num = Top_k.size();
+        vector<vector<float>> nearest(2, vector<float>(num));
+        for (int i = num - 1; i >= 0; i--) {
+            nearest[0][i] = Top_k.top().id;
+            nearest[1][i] = Top_k.top().dist;
             Top_k.pop();
         }
 
