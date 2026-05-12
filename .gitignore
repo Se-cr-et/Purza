@@ -1,4 +1,9 @@
 .env
 .vscode
 *.exe
+<<<<<<< Updated upstream
 cow.cpp
+=======
+/test/output
+/test/error
+>>>>>>> Stashed changes

@@ -20,17 +20,24 @@ int main(){
 
     while (true){
         // Holds the message to be sent to server, max 1024 char size
-        char message[1024] = {0};
+        char snd_message[1024] = {0};
+        char rcv_message[1024] = {0};
+
         cout << "Your message: ";
-        cin.get(message, 1024); cin.ignore();
+        cin.get(snd_message, 1024); cin.ignore();
 
         // If no message, exit loop
-        if (strlen(message) == 0){
+        if (strlen(snd_message) == 0){
+            send(ClientSocket, snd_message, strlen(snd_message), 0);
             break;
         }
 
         // Send the message to server
-        send(ClientSocket, message, strlen(message), 0);
+        send(ClientSocket, snd_message, strlen(snd_message), 0);
+
+        // Recieve message from the server
+        recv(ClientSocket, rcv_message, sizeof(rcv_message), 0);
+        cout << "Server: " << rcv_message << endl;
     }
 
     cout << "Connection has been closed" << endl;

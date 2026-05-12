@@ -32,7 +32,6 @@ int main()
     std::vector<std::vector<float>> k_vectors;
     std::vector<std::pair<long long, float>> ids_dis;
     v.k_nearest(3, t, k_vectors, ids_dis);
-
     for (int i = 0; i < ids_dis.size(); i++)
     {
         std::cout << ids_dis[i].first << ":" << ids_dis[i].second << ": ";
