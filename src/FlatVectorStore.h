@@ -6,6 +6,7 @@
 #include <queue>
 #include <algorithm>
 #include <cmath>
+#include <limits.h>
 #include <unordered_set>
 using namespace std;
 
@@ -52,10 +53,10 @@ private:
             return dist < Other.dist;
         }
     };
-
+    bool ivf_built;
 
 public:
-    FLatVectorStore(const int dim) : dimension(dim) {}
+    FLatVectorStore(const int dim) : dimension(dim), ivf_built(false) {}
     bool insert(const long long id, const std::vector<float> &vec)
     {
         if (vec.size() != dimension)
@@ -79,6 +80,26 @@ public:
                 vectors.push_back(vec[i]);
             }
         }
+        if (!ivf_built)
+            return true;
+        long long idx;
+        if (it != id_to_pos.end())
+            idx = it->second * dimension;
+        idx = (ids.size()-1)*dimension;
+        float closest_dist = numeric_limits<float>::max();
+        int closest_centroid = 0;
+        const float* v = vectors.data();
+        const float* c = centroids.data();
+        for (int i = 0; i < centroids.size(); i++)
+        {
+            float dist = distance_sq(v+(idx*dimension), c+(i*dimension));
+            if (dist < closest_dist)
+            {
+                closest_dist = dist;
+                closest_centroid = i;
+            }
+        }
+        vectors_cluster_id[closest_centroid].push_back(idx/dimension);
         return true;
     }
     void print_store() // print all the vectors with their corresponding ids in the terminal
@@ -190,7 +211,7 @@ public:
             // Assignment step
             for (long long i = 0; i < number; i++)
             {
-                int min_distance = __INT_MAX__;
+                float min_distance = numeric_limits<float>::max();
                 int cluster_id = 0;
 
                 for (int j = 0; j < k; j++)
@@ -252,6 +273,7 @@ public:
         return centroids;
     }
     vector<vector<float>> IVF(int nprobe, int k, vector<float> target){
+        ivf_built = true;
         priority_queue<cmp_dist> Max_Centroid;
         int K = vectors_cluster_id.size(); // Number of Centroids
 
