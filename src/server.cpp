@@ -144,7 +144,7 @@ int communication(int ClientSocket, Threader &T, FLatVectorStore& db)
                         ss << vec[j] << " ";
                     }
                 }
-                ss << '(' << k << " results, mode=" << mode << " nprobe=" << nprobe << ", scanned=" << scanned << ")\n";
+                ss << '(' << id_dis[0].size() << " results, mode=" << mode << " nprobe=" << nprobe << ", scanned=" << scanned << ")\n";
                 ss << '\0';
                 string str = ss.str();
                 const char* msg = str.c_str();
@@ -195,10 +195,15 @@ int communication(int ClientSocket, Threader &T, FLatVectorStore& db)
         }
         else if (!(strncmp(command, "QUIT", 4)))
         {
-            break;
+            const char* msg = "\n";
+            send(ClientSocket, msg, strlen(msg), 0);
+
+
         }
         else
         {
+            const char* msg = "No Attached Message\n";
+            send(ClientSocket, msg, strlen(msg), 0);
             // For Errors
         }
         cout << "Client " << ClientSocket - 3 << ": " << buffer << endl;

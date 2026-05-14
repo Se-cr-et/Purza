@@ -25,18 +25,19 @@ int main(){
 
         cin.get(snd_message, 1024); cin.ignore();
 
-        // If no message, exit loop
-        if (strlen(snd_message) == 0){
-            send(ClientSocket, snd_message, strlen(snd_message), 0);
-            break;
-        }
-
         // Send the message to server
         send(ClientSocket, snd_message, strlen(snd_message), 0);
 
         // Recieve message from the server
         recv(ClientSocket, rcv_message, sizeof(rcv_message), 0);
-        cout << rcv_message << endl;
+
+        // If no message, exit loop
+        if (!(strncmp(rcv_message, "\n", 1))){
+            break;
+        }
+        else{
+            cout << rcv_message << endl;
+        }
     }
 
     cout << "Connection has been closed" << endl;

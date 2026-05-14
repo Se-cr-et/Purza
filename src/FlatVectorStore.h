@@ -60,7 +60,7 @@ public:
     FLatVectorStore(const int dim) : dimension(dim), ivf_built(false) {}
     int get_db_size()
     {
-        return vectors.size();
+        return vectors.size()/dimension;
     }
     int get_no_clusters()
     {
@@ -310,6 +310,7 @@ public:
             float *t = target.data();
             float distance = distance_sq(t, c);
             c += dimension;
+
             if (Max_Centroid.size() <= nprobe){
                 Max_Centroid.push(cmp_dist(i,distance));
             }
@@ -321,20 +322,23 @@ public:
                 }
             }
         }
-        Max_Centroid.pop();
+
+        if (nprobe < vectors_cluster_id.size()){
+            Max_Centroid.pop();
+        }
 
         priority_queue<cmp_dist> Top_k;
-        for (int i = 0; i < nprobe; i++){
+        for (int i = 0; i < Max_Centroid.size(); i++){
             int CentroidID = Max_Centroid.top().id;
             int ClusterCount = vectors_cluster_id[CentroidID].size();
             float *v = vectors.data();
             float *t = target.data();
             Max_Centroid.pop();
-            scanned += ClusterCount;
             for (int j = 0; j < ClusterCount; j++){
                 int VectorID = vectors_cluster_id[CentroidID][j];
                 int offset = dimension*VectorID;
                 float distance = distance_sq(t, v+offset);
+                scanned++;
                 if (Top_k.size() <= k){
                     Top_k.push(cmp_dist(VectorID,distance));
                 }
@@ -344,13 +348,17 @@ public:
                 }
             }
         }
-        Top_k.pop();
+        if (k < Top_k.size()){
+            Top_k.pop();
+        }
 
         int num = Top_k.size();
         vector<vector<float>> nearest(2, vector<float>(num));
         for (int i = num - 1; i >= 0; i--) {
             nearest[0][i] = Top_k.top().id;
+            cout << "ID:" << Top_k.top().id << endl;
             nearest[1][i] = Top_k.top().dist;
+            cout << "DIST:" << Top_k.top().dist << endl;
             Top_k.pop();
         }
 
