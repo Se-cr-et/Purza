@@ -5,6 +5,9 @@
 #include <unistd.h>     // Not completely sure yet
 #include <thread>
 #include <vector>
+#include <sstream>
+#include "FlatVectorStore.h"
+#include "Parser.h"
 using namespace std;
 
 bool init_flag = true;
@@ -39,8 +42,10 @@ public:
     }
 };
 
-int communication(int ClientSocket, Threader &T)
+int communication(int ClientSocket, Threader &T, FLatVectorStore& db)
 {
+    Parser p;
+    int dim = db.get_dim();
     while (true)
     {
         // Holds the message recieved from the Client, max 1024 char size
@@ -60,76 +65,79 @@ int communication(int ClientSocket, Threader &T)
         int cmd_index = strcspn(buffer, " ");
         strncpy(command, buffer, cmd_index);
 
+
         if (!(strncmp(command, "ADD", 3)))
         {
             const int size = strlen(buffer) - strlen(command);
-            char sub_buffer[size] = {0};
+            char sub_buffer[size+1] = {0};
             strncpy(sub_buffer, buffer + strlen(command) + 1, size);
-
-            char *tok = strtok(sub_buffer, " ");
-            vector<int> vector;
-            while (tok != NULL)
+            long long id; vector<float> vector;
+            p.parse_add(sub_buffer, id, vector);
+            //empty ADD
+            if (vector.size() != dim || id == -1)
             {
-                vector.push_back(stoi(tok));
-                tok = strtok(NULL, " ");
+                const char* msg = "Invalid Format\n";
+                send(ClientSocket, msg, strlen(msg), 0);
+                continue;
             }
-
             // [IMPLEMENT ADD FUNCTIONALITY HERE]
             // vector variable contains the vector, with the first index containing id
-
-            cout << "IN ADD" << endl;
+            db.insert(id, vector);
+            const char* msg = "OK\n";
+            send(ClientSocket, msg, strlen(msg), 0);
         }
         else if (!(strncmp(command, "SEARCH", 6)))
         {
             const int size = strlen(buffer) - strlen(command);
             char sub_buffer[size] = {0};
             strncpy(sub_buffer, buffer + strlen(command) + 1, size);
-
-            char *tok = strtok(sub_buffer, " ");
-            vector<int> vector;
-            int dimension = 4, i = 0, nprobe = 0;
-            bool IVF_Flag = false;
-            while (tok != NULL)
+            vector<float> v; string mode; int k; int nprobe;
+            p.parse_search(sub_buffer, dim, v, mode, k, nprobe);
+            if (v.size() != dim || !(mode == "BRUTE" || mode == "IVF") || k == -1)
             {
-                if (i <= dimension)
-                {
-                    vector.push_back(stoi(tok));
-                }
-                else if (!(strncmp(tok, "BRUTE", 6)))
-                {
-                    // Doesnt do anything right now, but its here for future error handling
-                }
-                else if (!(strncmp(tok, "IVF", 3)))
-                {
-                    IVF_Flag = true;
-                    tok = strtok(NULL, " ");
-                    nprobe = stoi(tok);
-                }
-                else
-                {
-                }
-
-                i++;
-                tok = strtok(NULL, " ");
+                const char* msg = "Invalid Format\n";
+                send(ClientSocket, msg, strlen(msg), 0);
+                continue;
             }
-
-            if (IVF_Flag){
-                // [IMPLEMENT IVF FUNCTIONALITY HERE]
-                // vector variable contains the vector, with the last index containing k (top k). For nprobe, use nprobe variable
+            if (mode == "BRUTE")
+            {
+                char* reply[1024];
+                std::vector<std::vector<float>> k_vectors;
+                std::vector<std::pair<long long, float>> ids_dis;
+                db.k_nearest(3, v, k_vectors, ids_dis);
+                stringstream ss;
+                ss << '\n';
+                for (int i = 0; i < ids_dis.size(); i++)
+                {
+                    ss << ids_dis[i].first << ' ' << ids_dis[i].second << ' ';
+                    for (int j = 0; j < v.size(); j++)
+                    {
+                        ss << v[j] << ' ';
+                    }
+                    ss << '\n';
+                }
+                ss << '(' << k << " results, mode=" << mode << ", scanned=" << db.get_db_size() << ")\n";
+                ss << '\0';
+                char* msg = ss.c_str();
+                send(ClientSocket, msg, strlen(msg), 0);
             }
-            else{
-                // [IMPLEMENT BRUTE FUNCTIONALITY HERE]
-                // vector variable contains the vector, with the last index containing k (top k). 
+            if (mode == "IVF")
+            {
+                if (nprobe == -1)
+                {
+                    const char* msg = "Invalid Format\n";
+                    send(ClientSocket, msg, strlen(msg), 0);
+                    continue;
+                }
             }
-
-
-            cout << "IN SEARCH" << nprobe << endl;
         }
         else if (!(strncmp(command, "BUILD", 5)))
         {
+            const char* msg = "Building IVF Index\n";
+            send(ClientSocket, msg, strlen(msg), 0);
+            stringstream ss;
+            ss << "vectors:\t" << db.get_db_size();
 
-            // [IMPLEMENT BUILD FUNCTIONALITY HERE]
-            cout << "IN BUILD" << endl;
         }
         else if (!(strncmp(command, "STATS", 5)))
         {
@@ -168,7 +176,7 @@ int communication(int ClientSocket, Threader &T)
     return -1;
 }
 
-void accept_cli(int Server, int max, Threader &Thread)
+void accept_cli(int Server, int max, Threader &Thread, FLatVectorStore& db)
 {
     while (true)
     {
@@ -191,7 +199,8 @@ void accept_cli(int Server, int max, Threader &Thread)
 
 int main()
 {
-
+    const int dim = 4;
+    FLatVectorStore db(dim);
     // Creating a server socket
     int max = 5;
     int ServerSocket = socket(AF_INET, SOCK_STREAM, 0);

@@ -18,6 +18,7 @@ class FLatVectorStore
 {
 private:
     int dimension;
+    int iterations;
     std::vector<float> vectors;
     std::vector<long long> ids;                         // stores the id for the vector at ith pos
     std::unordered_map<long long, long long> id_to_pos; // maps id to the pos of the vector
@@ -57,6 +58,26 @@ private:
 
 public:
     FLatVectorStore(const int dim) : dimension(dim), ivf_built(false) {}
+    int get_db_size()
+    {
+        return vectors.size();
+    }
+    int get_no_clusters()
+    {
+        return vectors_cluster_id.size();
+    }
+    int get_iterations()
+    {
+        return iterations;
+    }
+    bool get_ivf_built()
+    {
+        return ivf_built;
+    }
+    int get_dim()
+    {
+        return dimension;
+    }
     bool insert(const long long id, const std::vector<float> &vec)
     {
         if (vec.size() != dimension)
@@ -128,10 +149,6 @@ public:
             }
             return v;
         }
-    }
-    int get_dim()
-    {
-        return dimension;
     }
     bool k_nearest(const int k, const std::vector<float> &target,
                    std::vector<std::vector<float>> &k_vectors, std::vector<std::pair<long long, float>> &ids_dis)
