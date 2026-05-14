@@ -220,8 +220,8 @@ public:
         }
 
         const float *v = vectors.data();
-
-        for (int iteration = 0; iteration < 50; iteration++)
+        int iteration;
+        for (iteration = 0; iteration < 50; iteration++)
         {
             bool update_happened = false;
 
@@ -282,6 +282,7 @@ public:
                 }
             }
         }
+        iterations = iteration;
         vectors_cluster_id = vector<vector<long long>>(k);
         for (long long i = 0; i < number; i++)
         {

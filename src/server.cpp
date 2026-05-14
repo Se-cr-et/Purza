@@ -6,6 +6,7 @@
 #include <thread>
 #include <vector>
 #include <sstream>
+#include <chrono>
 #include "FlatVectorStore.h"
 #include "Parser.h"
 using namespace std;
@@ -133,11 +134,19 @@ int communication(int ClientSocket, Threader &T, FLatVectorStore& db)
         }
         else if (!(strncmp(command, "BUILD", 5)))
         {
-            const char* msg = "Building IVF Index\n";
+            auto start = std::chrono::high_resolution_clock::now();
+            char* msg = "Building IVF Index\n";
             send(ClientSocket, msg, strlen(msg), 0);
+            db.llyods_algorithm();
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> elapsed = end - start;
             stringstream ss;
-            ss << "vectors:\t" << db.get_db_size();
-
+            ss << "\tvectors:\t" << db.get_db_size() << '\n';
+            ss << "\tclusters:\t" << db.get_no_clusters() << '\n';
+            ss << "\titerations:\t" << db.get_iterations() << '\n';
+            ss << "\tdone in" << elapsed.count() << "s.\n";
+            msg = ss.c_str();
+            send(ClientSocket, msg, strlen(msg), 0);
         }
         else if (!(strncmp(command, "STATS", 5)))
         {
