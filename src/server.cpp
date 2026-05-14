@@ -20,9 +20,9 @@ class Threader
 
 public:
     Threader() : num_of_threads(0) {}
-    void insert(int (*func)(int, Threader &), int value, Threader &T)
+    void insert(int (*func)(int, Threader &, FLatVectorStore&), int value, Threader &T, FLatVectorStore& db)
     {
-        Threads.push_back(thread(func, value, ref(T)));
+        Threads.push_back(thread(func, value, ref(T), ref(db)));
         num_of_threads++;
     }
     int size()
@@ -69,9 +69,9 @@ int communication(int ClientSocket, Threader &T, FLatVectorStore& db)
 
         if (!(strncmp(command, "ADD", 3)))
         {
-            const int size = strlen(buffer) - strlen(command);
-            char sub_buffer[size+1] = {0};
-            strncpy(sub_buffer, buffer + strlen(command) + 1, size);
+            const int s = strlen(buffer) - strlen(command);
+            char sub_buffer[1024] = {0};
+            strncpy(sub_buffer, buffer + strlen(command) + 1, s);
             long long id; vector<float> vector;
             p.parse_add(sub_buffer, id, vector);
             //empty ADD
@@ -89,9 +89,9 @@ int communication(int ClientSocket, Threader &T, FLatVectorStore& db)
         }
         else if (!(strncmp(command, "SEARCH", 6)))
         {
-            const int size = strlen(buffer) - strlen(command);
-            char sub_buffer[size] = {0};
-            strncpy(sub_buffer, buffer + strlen(command) + 1, size);
+            const int s = strlen(buffer) - strlen(command);
+            char sub_buffer[1024] = {0};
+            strncpy(sub_buffer, buffer + strlen(command) + 1, s);
             vector<float> v; string mode; int k; int nprobe;
             p.parse_search(sub_buffer, dim, v, mode, k, nprobe);
             if (v.size() != dim || !(mode == "BRUTE" || mode == "IVF") || k == -1)
@@ -105,21 +105,22 @@ int communication(int ClientSocket, Threader &T, FLatVectorStore& db)
                 char* reply[1024];
                 std::vector<std::vector<float>> k_vectors;
                 std::vector<std::pair<long long, float>> ids_dis;
-                db.k_nearest(3, v, k_vectors, ids_dis);
+                db.k_nearest(k, v, k_vectors, ids_dis);
                 stringstream ss;
                 ss << '\n';
-                for (int i = 0; i < ids_dis.size(); i++)
+                for (int i = 0; i < k_vectors.size(); i++)
                 {
-                    ss << ids_dis[i].first << ' ' << ids_dis[i].second << ' ';
-                    for (int j = 0; j < v.size(); j++)
+                    ss << ids_dis[i].first << "  " << ids_dis[i].second << "\t";
+                    for (int j = 0; j < k_vectors[i].size(); j++)
                     {
-                        ss << v[j] << ' ';
+                        ss << k_vectors[i][j] << ' ';
                     }
                     ss << '\n';
                 }
                 ss << '(' << k << " results, mode=" << mode << ", scanned=" << db.get_db_size() << ")\n";
                 ss << '\0';
-                char* msg = ss.c_str();
+                string str = ss.str();
+                const char* msg = str.c_str();
                 send(ClientSocket, msg, strlen(msg), 0);
             }
             if (mode == "IVF")
@@ -130,13 +131,29 @@ int communication(int ClientSocket, Threader &T, FLatVectorStore& db)
                     send(ClientSocket, msg, strlen(msg), 0);
                     continue;
                 }
+                int scanned = 0;
+                auto id_dis = db.IVF(nprobe, k, v, scanned);
+                stringstream ss;
+                for (int i = 0; i < id_dis[0].size(); i++)
+                {
+                    ss << '\n';
+                    ss << id_dis[0][i] << "  " << id_dis[1][i] << "\t";
+                    auto vec = db.get_vec_id(id_dis[0][i]);
+                    for (int j = 0; j < vec.size(); j++)
+                    {
+                        ss << vec[j] << " ";
+                    }
+                }
+                ss << '(' << k << " results, mode=" << mode << " nprobe=" << nprobe << ", scanned=" << scanned << ")\n";
+                ss << '\0';
+                string str = ss.str();
+                const char* msg = str.c_str();
+                send(ClientSocket, msg, strlen(msg), 0);
             }
         }
         else if (!(strncmp(command, "BUILD", 5)))
         {
             auto start = std::chrono::high_resolution_clock::now();
-            char* msg = "Building IVF Index\n";
-            send(ClientSocket, msg, strlen(msg), 0);
             db.llyods_algorithm();
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;
@@ -144,14 +161,27 @@ int communication(int ClientSocket, Threader &T, FLatVectorStore& db)
             ss << "\tvectors:\t" << db.get_db_size() << '\n';
             ss << "\tclusters:\t" << db.get_no_clusters() << '\n';
             ss << "\titerations:\t" << db.get_iterations() << '\n';
-            ss << "\tdone in" << elapsed.count() << "s.\n";
-            msg = ss.c_str();
-            send(ClientSocket, msg, strlen(msg), 0);
+            ss << "\tdone in " << elapsed.count() << " seconds.\n";
+            string str = ss.str();
+            const char* m = str.c_str();
+            send(ClientSocket, m, strlen(m), 0);
         }
         else if (!(strncmp(command, "STATS", 5)))
         {
-            // [IMPLEMENT STATS FUNCTIONALITY HERE]
-            cout << "IN STATS" << endl;
+            stringstream ss;
+            ss << "dimension:\t" << db.get_dim() << '\n';
+            ss << "total vectors:\t" << db.get_db_size() << '\n';
+            ss <<  "Index Built:\t" <<db.get_ivf_built() ? "yes\n" : "no\n";
+            ss << "clusters:\t" << db.get_no_clusters() << '\n';
+            auto cs = db.get_cluster_sizes();
+            for (int i = 0; i < cs.size(); i++)
+            {
+                ss << cs[i] << ", ";
+            }
+            ss << "\n";
+            string str = ss.str();
+            const char* m = str.c_str();
+            send(ClientSocket, m, strlen(m), 0);
         }
         else if (!(strncmp(command, "SAVE", 4)))
         {
@@ -165,17 +195,11 @@ int communication(int ClientSocket, Threader &T, FLatVectorStore& db)
         }
         else if (!(strncmp(command, "QUIT", 4)))
         {
-            // [IMPLEMENT QUIT FUNCTIONALITY HERE]
-            cout << "IN QUIT" << endl;
+            break;
         }
         else
         {
             // For Errors
-        }
-
-        if (!(cmd_index == strlen(buffer)))
-        {
-            send(ClientSocket, command, strlen(command), 0);
         }
         cout << "Client " << ClientSocket - 3 << ": " << buffer << endl;
     }
@@ -190,13 +214,13 @@ void accept_cli(int Server, int max, Threader &Thread, FLatVectorStore& db)
     while (true)
     {
         int ClientSocket = accept(Server, nullptr, nullptr);
-        cout << "Connected with: " << ClientSocket << endl;
+        cout << "Connected with " << ClientSocket-3 << endl;
 
         // Has max connections been created ?
         if (!(Thread.size() == max))
         {
             // Create a thread for every new connection
-            Thread.insert(communication, ClientSocket, Thread);
+            Thread.insert(communication, ClientSocket, Thread, ref(db));
             init_flag = false;
         }
         else
@@ -228,7 +252,7 @@ int main()
     // Waits/Listens for connections
     listen(ServerSocket, max);
 
-    thread connections(accept_cli, ServerSocket, max, ref(Threads));
+    thread connections(accept_cli, ServerSocket, max, ref(Threads), ref(db));
     while (true)
     {
         // Accept connections from the Queue [Listen function holds the Queue]

@@ -23,7 +23,6 @@ int main(){
         char snd_message[1024] = {0};
         char rcv_message[1024] = {0};
 
-        cout << "Your message: ";
         cin.get(snd_message, 1024); cin.ignore();
 
         // If no message, exit loop
@@ -37,7 +36,7 @@ int main(){
 
         // Recieve message from the server
         recv(ClientSocket, rcv_message, sizeof(rcv_message), 0);
-        cout << "Server: " << rcv_message << endl;
+        cout << rcv_message << endl;
     }
 
     cout << "Connection has been closed" << endl;

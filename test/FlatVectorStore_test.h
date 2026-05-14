@@ -96,7 +96,8 @@ public:
         int k = 5;
         int nprobe = 2;
         cout << "Searching for top " << k << " results using nprobe=" << nprobe << "..." << endl;
-        vector<vector<float>> results = store.IVF(nprobe, k, target);
+        int scanned = 0;
+        vector<vector<float>> results = store.IVF(nprobe, k, target, scanned);
         cout << "IVF Search Results:" << endl;
         for (size_t i = 0; i < results[0].size(); i++) {
             cout << "Rank " << i + 1 << " | ID: " << (long long)results[0][i]

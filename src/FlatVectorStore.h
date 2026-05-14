@@ -78,6 +78,15 @@ public:
     {
         return dimension;
     }
+    vector<int> get_cluster_sizes()
+    {
+        vector<int> v;
+        for (int i = 0; i < vectors_cluster_id.size(); i++)
+        {
+            v.push_back(vectors_cluster_id[i].size());
+        }
+        return v;
+    }
     bool insert(const long long id, const std::vector<float> &vec)
     {
         if (vec.size() != dimension)
@@ -290,7 +299,8 @@ public:
         }
         return centroids;
     }
-    vector<vector<float>> IVF(int nprobe, int k, vector<float> target){
+    vector<vector<float>> IVF(int nprobe, int k, vector<float> target, int& scanned){
+        scanned = 0;
         ivf_built = true;
         priority_queue<cmp_dist> Max_Centroid;
         int K = vectors_cluster_id.size(); // Number of Centroids
@@ -320,6 +330,7 @@ public:
             float *v = vectors.data();
             float *t = target.data();
             Max_Centroid.pop();
+            scanned += ClusterCount;
             for (int j = 0; j < ClusterCount; j++){
                 int VectorID = vectors_cluster_id[CentroidID][j];
                 int offset = dimension*VectorID;
