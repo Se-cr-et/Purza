@@ -7,11 +7,13 @@
 #include <vector>
 #include <sstream>
 #include <chrono>
+#include <mutex>
 #include "FlatVectorStore.h"
 #include "Parser.h"
 using namespace std;
 
 bool init_flag = true;
+mutex mtx;
 
 class Threader
 {
@@ -20,7 +22,7 @@ class Threader
 
 public:
     Threader() : num_of_threads(0) {}
-    void insert(int (*func)(int, Threader &, FLatVectorStore&), int value, Threader &T, FLatVectorStore& db)
+    void insert(int (*func)(int, Threader &, FLatVectorStore &), int value, Threader &T, FLatVectorStore &db)
     {
         Threads.push_back(thread(func, value, ref(T), ref(db)));
         num_of_threads++;
@@ -43,7 +45,7 @@ public:
     }
 };
 
-int communication(int ClientSocket, Threader &T, FLatVectorStore& db)
+int communication(int ClientSocket, Threader &T, FLatVectorStore &db)
 {
     Parser p;
     int dim = db.get_dim();
@@ -66,43 +68,48 @@ int communication(int ClientSocket, Threader &T, FLatVectorStore& db)
         int cmd_index = strcspn(buffer, " ");
         strncpy(command, buffer, cmd_index);
 
-
         if (!(strncmp(command, "ADD", 3)))
         {
+            mtx.lock();
             const int s = strlen(buffer) - strlen(command);
             char sub_buffer[1024] = {0};
             strncpy(sub_buffer, buffer + strlen(command) + 1, s);
-            long long id; vector<float> vector;
+            long long id;
+            vector<float> vector;
             p.parse_add(sub_buffer, id, vector);
-            //empty ADD
+            // empty ADD
             if (vector.size() != dim || id == -1)
             {
-                const char* msg = "Invalid Format\n";
+                const char *msg = "Invalid Format\n";
                 send(ClientSocket, msg, strlen(msg), 0);
                 continue;
             }
             // [IMPLEMENT ADD FUNCTIONALITY HERE]
             // vector variable contains the vector, with the first index containing id
             db.insert(id, vector);
-            const char* msg = "OK\n";
+            const char *msg = "OK\n";
             send(ClientSocket, msg, strlen(msg), 0);
+            mtx.unlock();
         }
         else if (!(strncmp(command, "SEARCH", 6)))
         {
             const int s = strlen(buffer) - strlen(command);
             char sub_buffer[1024] = {0};
             strncpy(sub_buffer, buffer + strlen(command) + 1, s);
-            vector<float> v; string mode; int k; int nprobe;
+            vector<float> v;
+            string mode;
+            int k;
+            int nprobe;
             p.parse_search(sub_buffer, dim, v, mode, k, nprobe);
             if (v.size() != dim || !(mode == "BRUTE" || mode == "IVF") || k == -1)
             {
-                const char* msg = "Invalid Format\n";
+                const char *msg = "Invalid Format\n";
                 send(ClientSocket, msg, strlen(msg), 0);
                 continue;
             }
             if (mode == "BRUTE")
             {
-                char* reply[1024];
+                char *reply[1024];
                 std::vector<std::vector<float>> k_vectors;
                 std::vector<std::pair<long long, float>> ids_dis;
                 db.k_nearest(k, v, k_vectors, ids_dis);
@@ -120,14 +127,14 @@ int communication(int ClientSocket, Threader &T, FLatVectorStore& db)
                 ss << '(' << k << " results, mode=" << mode << ", scanned=" << db.get_db_size() << ")\n";
                 ss << '\0';
                 string str = ss.str();
-                const char* msg = str.c_str();
+                const char *msg = str.c_str();
                 send(ClientSocket, msg, strlen(msg), 0);
             }
             if (mode == "IVF")
             {
                 if (nprobe == -1)
                 {
-                    const char* msg = "Invalid Format\n";
+                    const char *msg = "Invalid Format\n";
                     send(ClientSocket, msg, strlen(msg), 0);
                     continue;
                 }
@@ -147,12 +154,13 @@ int communication(int ClientSocket, Threader &T, FLatVectorStore& db)
                 ss << '(' << id_dis[0].size() << " results, mode=" << mode << " nprobe=" << nprobe << ", scanned=" << scanned << ")\n";
                 ss << '\0';
                 string str = ss.str();
-                const char* msg = str.c_str();
+                const char *msg = str.c_str();
                 send(ClientSocket, msg, strlen(msg), 0);
             }
         }
         else if (!(strncmp(command, "BUILD", 5)))
         {
+            mtx.lock();
             auto start = std::chrono::high_resolution_clock::now();
             db.llyods_algorithm();
             auto end = std::chrono::high_resolution_clock::now();
@@ -163,15 +171,16 @@ int communication(int ClientSocket, Threader &T, FLatVectorStore& db)
             ss << "\titerations:\t" << db.get_iterations() << '\n';
             ss << "\tdone in " << elapsed.count() << " seconds.\n";
             string str = ss.str();
-            const char* m = str.c_str();
+            const char *m = str.c_str();
             send(ClientSocket, m, strlen(m), 0);
+            mtx.unlock();
         }
         else if (!(strncmp(command, "STATS", 5)))
         {
             stringstream ss;
             ss << "dimension:\t" << db.get_dim() << '\n';
             ss << "total vectors:\t" << db.get_db_size() << '\n';
-            ss <<  "Index Built:\t" <<db.get_ivf_built() ? "yes\n" : "no\n";
+            ss << "Index Built:\t" << db.get_ivf_built() ? "yes\n" : "no\n";
             ss << "clusters:\t" << db.get_no_clusters() << '\n';
             auto cs = db.get_cluster_sizes();
             for (int i = 0; i < cs.size(); i++)
@@ -180,7 +189,7 @@ int communication(int ClientSocket, Threader &T, FLatVectorStore& db)
             }
             ss << "\n";
             string str = ss.str();
-            const char* m = str.c_str();
+            const char *m = str.c_str();
             send(ClientSocket, m, strlen(m), 0);
         }
         else if (!(strncmp(command, "SAVE", 4)))
@@ -195,14 +204,12 @@ int communication(int ClientSocket, Threader &T, FLatVectorStore& db)
         }
         else if (!(strncmp(command, "QUIT", 4)))
         {
-            const char* msg = "\n";
+            const char *msg = "\n";
             send(ClientSocket, msg, strlen(msg), 0);
-
-
         }
         else
         {
-            const char* msg = "No Attached Message\n";
+            const char *msg = "No Attached Message\n";
             send(ClientSocket, msg, strlen(msg), 0);
             // For Errors
         }
@@ -214,12 +221,12 @@ int communication(int ClientSocket, Threader &T, FLatVectorStore& db)
     return -1;
 }
 
-void accept_cli(int Server, int max, Threader &Thread, FLatVectorStore& db)
+void accept_cli(int Server, int max, Threader &Thread, FLatVectorStore &db)
 {
     while (true)
     {
         int ClientSocket = accept(Server, nullptr, nullptr);
-        cout << "Connected with " << ClientSocket-3 << endl;
+        cout << "Connected with " << ClientSocket - 3 << endl;
 
         // Has max connections been created ?
         if (!(Thread.size() == max))
