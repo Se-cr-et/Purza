@@ -92,18 +92,21 @@ public:
         if (vec.size() != dimension)
             return false;
         auto it = id_to_pos.find(id);
-        if (it != id_to_pos.end())
+        long long vector_pos;
+        bool is_update = (it != id_to_pos.end());
+        if (is_update)
         {
-            long long index = it->second * dimension;
+            vector_pos = it->second;
+            long long idx = vector_pos * dimension;
             for (int i = 0; i < dimension; i++)
             {
-                vectors[i + index] = vec[i];
+                vectors[i + idx] = vec[i];
             }
         }
         else
         {
-            long long pos = ids.size();
-            id_to_pos[id] = pos;
+            vector_pos = ids.size();
+            id_to_pos[id] = vector_pos;
             ids.push_back(id);
             for (int i = 0; i < dimension; i++)
             {
@@ -112,24 +115,20 @@ public:
         }
         if (!ivf_built)
             return true;
-        long long idx;
-        if (it != id_to_pos.end())
-            idx = it->second * dimension;
-        idx = (ids.size()-1)*dimension;
         float closest_dist = numeric_limits<float>::max();
         int closest_centroid = 0;
-        const float* v = vectors.data();
+        const float* v = vectors.data() + (vector_pos * dimension);
         const float* c = centroids.data();
-        for (int i = 0; i < centroids.size(); i++)
+        for (int i = 0; i < vectors_cluster_id.size(); i++)
         {
-            float dist = distance_sq(v+(idx*dimension), c+(i*dimension));
+            float dist = distance_sq(v, c+(i*dimension));
             if (dist < closest_dist)
             {
                 closest_dist = dist;
                 closest_centroid = i;
             }
         }
-        vectors_cluster_id[closest_centroid].push_back(idx/dimension);
+        vectors_cluster_id[closest_centroid].push_back(vector_pos);
         return true;
     }
     void print_store() // print all the vectors with their corresponding ids in the terminal
@@ -212,7 +211,15 @@ public:
     vector<float> llyods_algorithm()
     {
         long long number = ids.size();
+        if (number == 0) {
+            ivf_built = false; // Cannot build IVF with 0 vectors
+            return vector<float>();
+        }
+
+        ivf_built = true;
         long long k = sqrt(number);
+        if (k == 0)
+            k = 1;
         centroids = vector<float>(k*dimension);    // stores centroid coordinates
         vector<int> vector_cluster_id(number, -1); // stores the cluster index of vectors
 
@@ -299,62 +306,44 @@ public:
         }
         return centroids;
     }
-    vector<vector<float>> IVF(int nprobe, int k, vector<float> target, int& scanned){
+    vector<vector<float>> IVF(int nprobe, int k, vector<float> target, int& scanned) {
         scanned = 0;
-        ivf_built = true;
         priority_queue<cmp_dist> Max_Centroid;
-        int K = vectors_cluster_id.size(); // Number of Centroids
+        int K = vectors_cluster_id.size();
+        if (K == 0)
+            return vector<vector<float>>();
 
-        float *c = centroids.data();
-        for (int i = 0; i < K; i++){
-            float *t = target.data();
-            float distance = distance_sq(t, c);
-            c += dimension;
-            if (Max_Centroid.size() <= nprobe){
-                Max_Centroid.push(cmp_dist(i,distance));
-            }
-            else{
-                if (distance < Max_Centroid.top().dist)
-                {
-                    Max_Centroid.pop();
-                    Max_Centroid.push(cmp_dist(i,distance));
-                }
+        for (int i = 0; i < K; i++) {
+            float distance = distance_sq(target.data(), centroids.data() + (i * dimension));
+            Max_Centroid.push(cmp_dist(i, distance));
+            if (Max_Centroid.size() > nprobe) {
+                Max_Centroid.pop();
             }
         }
-        Max_Centroid.pop();
-
         priority_queue<cmp_dist> Top_k;
-        for (int i = 0; i < nprobe; i++){
+        while (!Max_Centroid.empty()) {
             int CentroidID = Max_Centroid.top().id;
-            int ClusterCount = vectors_cluster_id[CentroidID].size();
-            float *v = vectors.data();
-            float *t = target.data();
             Max_Centroid.pop();
-            scanned += ClusterCount;
-            for (int j = 0; j < ClusterCount; j++){
-                int VectorID = vectors_cluster_id[CentroidID][j];
-                int offset = dimension*VectorID;
-                float distance = distance_sq(t, v+offset);
-                if (Top_k.size() <= k){
-                    Top_k.push(cmp_dist(VectorID,distance));
-                }
-                else{
+            vector<long long>& cluster = vectors_cluster_id[CentroidID];
+            scanned += cluster.size();
+            for (int i = 0; i < cluster.size(); i++) {
+                float distance = distance_sq(target.data(), vectors.data()+(cluster[i]*dimension));
+                Top_k.push(cmp_dist(cluster[i], distance));
+                if (Top_k.size() > k) {
                     Top_k.pop();
-                    Top_k.push(cmp_dist(VectorID,distance));
                 }
             }
         }
-        Top_k.pop();
-
         int num = Top_k.size();
+        if (num == 0)
+            return vector<vector<float>>();
         vector<vector<float>> nearest(2, vector<float>(num));
         for (int i = num - 1; i >= 0; i--) {
-            nearest[0][i] = Top_k.top().id;
+            long long pos = Top_k.top().id;
+            nearest[0][i] = ids[pos];
             nearest[1][i] = Top_k.top().dist;
             Top_k.pop();
-        }
-
-        return nearest;
+        }        return nearest;
     }
     void Cluster(){
         for (int i = 0; i < vectors_cluster_id.size(); i++)

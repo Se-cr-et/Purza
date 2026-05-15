@@ -5,7 +5,7 @@
 int main()
 {
     FVS_test t1;
-    t1.test_IVF();
+    t1.run_db_console();
     return 0;
 }
 

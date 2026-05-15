@@ -117,7 +117,7 @@ int communication(int ClientSocket, Threader &T, FLatVectorStore& db)
                     }
                     ss << '\n';
                 }
-                ss << '(' << k << " results, mode=" << mode << ", scanned=" << db.get_db_size() << ")\n";
+                ss << '(' << k_vectors.size() << " results, mode=" << mode << ", scanned=" << db.get_db_size() << ")\n";
                 ss << '\0';
                 string str = ss.str();
                 const char* msg = str.c_str();
@@ -131,10 +131,16 @@ int communication(int ClientSocket, Threader &T, FLatVectorStore& db)
                     send(ClientSocket, msg, strlen(msg), 0);
                     continue;
                 }
+                if (!db.get_ivf_built())
+                {
+                    const char* msg = "IVF not built\n";
+                    send(ClientSocket, msg, strlen(msg), 0);
+                    continue;
+                }
                 int scanned = 0;
                 auto id_dis = db.IVF(nprobe, k, v, scanned);
                 stringstream ss;
-                for (int i = 0; i < id_dis[0].size(); i++)
+                for (int i = 0; i < !id_dis.empty() && id_dis[0].size(); i++)
                 {
                     ss << '\n';
                     ss << id_dis[0][i] << "  " << id_dis[1][i] << "\t";
@@ -144,7 +150,11 @@ int communication(int ClientSocket, Threader &T, FLatVectorStore& db)
                         ss << vec[j] << " ";
                     }
                 }
-                ss << '(' << k << " results, mode=" << mode << " nprobe=" << nprobe << ", scanned=" << scanned << ")\n";
+                if (id_dis.empty())
+                    ss << "(0 results, mode=" << mode << " nprobe=" << nprobe << ", scanned=" << scanned << ")\n";
+                else
+                    ss << '(' << v.size() << " results, mode=" << mode << " nprobe=" << nprobe << ", scanned=" << scanned << ")\n";
+
                 ss << '\0';
                 string str = ss.str();
                 const char* msg = str.c_str();
@@ -171,7 +181,7 @@ int communication(int ClientSocket, Threader &T, FLatVectorStore& db)
             stringstream ss;
             ss << "dimension:\t" << db.get_dim() << '\n';
             ss << "total vectors:\t" << db.get_db_size() << '\n';
-            ss <<  "Index Built:\t" <<db.get_ivf_built() ? "yes\n" : "no\n";
+            ss <<  "Index Built:\t" <<db.get_ivf_built() << "\n";
             ss << "clusters:\t" << db.get_no_clusters() << '\n';
             auto cs = db.get_cluster_sizes();
             for (int i = 0; i < cs.size(); i++)
