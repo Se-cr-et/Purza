@@ -20,8 +20,10 @@ private:
     int dimension;
     int iterations;
     std::vector<float> vectors;
+    std::vector<float> norm_vectors;
     std::vector<long long> ids;                         // stores the id for the vector at ith pos
     std::unordered_map<long long, long long> id_to_pos; // maps id to the pos of the vector
+    bool is_cosine;
 
     vector<float> centroids;                            // stores centroid coordinates
     vector<vector<long long>> vectors_cluster_id;             // outer vector is clusters, inner vector stores vector index
@@ -36,6 +38,15 @@ private:
             sum += diff * diff;
         }
         return sum;
+    }
+    float cosine_sim(const float *a, const float *b)
+    {
+        float dot = 0;
+        for (int i = 0; i < dimension; i++)
+        {
+            dot += a[i] * b[i];
+        }
+        return 1-dot;
     }
     struct pair_cmp_lesser // pair first contains id, pair second contains distance
     {
@@ -57,7 +68,7 @@ private:
     bool ivf_built;
 
 public:
-    FLatVectorStore(const int dim) : dimension(dim), ivf_built(false) {}
+    FLatVectorStore(const int dim) : dimension(dim), ivf_built(false), is_cosine(false) {}
     int get_db_size()
     {
         return vectors.size();
@@ -94,6 +105,7 @@ public:
         auto it = id_to_pos.find(id);
         long long vector_pos;
         bool is_update = (it != id_to_pos.end());
+        float sum = 0;
         if (is_update)
         {
             vector_pos = it->second;
@@ -101,6 +113,12 @@ public:
             for (int i = 0; i < dimension; i++)
             {
                 vectors[i + idx] = vec[i];
+                sum += vec[i] * vec[i];
+            }
+            sum = sqrt(sum);
+            for (int i = 0; i < dimension; i++)
+            {
+                norm_vectors[i + idx] = vec[i] / sum;
             }
         }
         else
@@ -111,17 +129,31 @@ public:
             for (int i = 0; i < dimension; i++)
             {
                 vectors.push_back(vec[i]);
+                sum += vec[i] * vec[i];
+            }
+            sum = sqrt(sum);
+            for (int i = 0; i < dimension; i++)
+            {
+                norm_vectors.push_back(vec[i] / sum);
             }
         }
         if (!ivf_built)
             return true;
         float closest_dist = numeric_limits<float>::max();
         int closest_centroid = 0;
-        const float* v = vectors.data() + (vector_pos * dimension);
+        const float* v;
+        if (is_cosine)
+            v = norm_vectors.data() + (vector_pos * dimension);
+        else
+            v = vectors.data() + (vector_pos * dimension);
         const float* c = centroids.data();
         for (int i = 0; i < vectors_cluster_id.size(); i++)
         {
-            float dist = distance_sq(v, c+(i*dimension));
+            float dist = 0;
+            if (is_cosine)
+                dist = cosine_sim(v, c+(i*dimension));
+            else
+                dist = distance_sq(v, c+(i*dimension));
             if (dist < closest_dist)
             {
                 closest_dist = dist;
@@ -158,9 +190,22 @@ public:
             return v;
         }
     }
-    bool k_nearest(const int k, const std::vector<float> &target,
+    bool k_nearest(const int k, std::vector<float> target,
                    std::vector<std::vector<float>> &k_vectors, std::vector<std::pair<long long, float>> &ids_dis)
     {
+        if (is_cosine)
+        {
+            float sum = 0;
+            for (int i = 0; i < dimension; i++)
+            {
+                sum += target[i] * target[i];
+            }
+            sum = sqrt(sum);
+            for (int i = 0; i < dimension; i++)
+            {
+                target[i] = target[i] / sum;
+            }
+        }
         k_vectors.clear();
         ids_dis.clear();
         if (ids.size() < k || target.size() != dimension)
@@ -170,18 +215,30 @@ public:
         std::priority_queue<std::pair<long long, float>,
                             std::vector<std::pair<long long, float>>, pair_cmp_lesser>
             pq;
-        const float *v = vectors.data();
+        const float *v;
+        if (is_cosine)
+            v = norm_vectors.data();
+        else
+            v = vectors.data();
         int i;
         // populate the pq with first k pairs
         const float *t = target.data();
         for (i = 0; i < k; i++)
         {
-            float dist = distance_sq(v + (i * dimension), t);
+            float dist = 0;
+            if (is_cosine)
+                dist = cosine_sim(v + (i * dimension), t);
+            else
+                dist = distance_sq(v + (i * dimension), t);
             pq.push(std::pair<long long, float>(ids[i], dist));
         }
         for (; i < ids.size(); i++)
         {
-            float dist = distance_sq(v + (i * dimension), t);
+            float dist = 0;
+            if (is_cosine)
+                dist = cosine_sim(v + (i * dimension), t);
+            else
+                dist = distance_sq(v + (i * dimension), t);
             if (dist < pq.top().second)
             {
                 pq.pop();
@@ -230,12 +287,19 @@ public:
             if (picked.insert(random_position).second) {
                 int i = picked.size() - 1;
                 for (int j = 0; j < dimension; j++) {
-                    centroids[i * dimension + j] = vectors[random_position * dimension + j];
+                    if (is_cosine)
+                        centroids[i * dimension + j] = norm_vectors[random_position * dimension + j];
+                    else
+                        centroids[i * dimension + j] = vectors[random_position * dimension + j];
                 }
             }
         }
 
-        const float *v = vectors.data();
+        const float *v;
+        if (is_cosine)
+            v = norm_vectors.data();
+        else
+            v = vectors.data();
         int iteration;
         for (iteration = 0; iteration < 50; iteration++)
         {
@@ -250,7 +314,11 @@ public:
                 for (int j = 0; j < k; j++)
                 {
                     const float *c = centroids.data();
-                    float distance = distance_sq(c + (j * dimension), v + (i * dimension));
+                    float distance = 0;
+                    if (is_cosine)
+                        distance = cosine_sim(c + (j * dimension), v + (i * dimension));
+                    else
+                        distance = distance_sq(c + (j * dimension), v + (i * dimension));
 
                     if (distance < min_distance) // updating distance and cluster id
                     {
@@ -270,7 +338,7 @@ public:
             if (!update_happened)
                 break;
 
-            // Recompute Centrouds
+            // Recompute Centroids
             vector<float> sum(k * dimension, 0);  // stores sum of centroid coordinates
             vector<int> count_of_vectors(k, 0); // stores number of vectors in ith cluster
 
@@ -282,7 +350,10 @@ public:
 
                 for (int dim = 0; dim < dimension; dim++)
                 {
-                    sum[cluster * dimension + dim] += vectors[j * dimension + dim];
+                    if (is_cosine)
+                        sum[cluster * dimension + dim] += norm_vectors[j * dimension + dim];
+                    else
+                        sum[cluster * dimension + dim] += vectors[j * dimension + dim];
                 }
             }
 
@@ -292,9 +363,19 @@ public:
                 if (count_of_vectors[j] == 0)
                     continue;
 
+                float norm_sum = 0;
                 for (int dim = 0; dim < dimension; dim++)
                 {
                     centroids[j * dimension + dim] = sum[j * dimension + dim] / (float)count_of_vectors[j];
+                    if (is_cosine)
+                        norm_sum += centroids[j * dimension + dim] * centroids[j * dimension + dim];
+                }
+                //normalize
+                if (is_cosine) {
+                    norm_sum = sqrt(norm_sum);
+                    for (int dim = 0; dim < dimension; dim++) {
+                        centroids[j * dimension + dim] /= norm_sum;
+                    }
                 }
             }
         }
@@ -308,13 +389,29 @@ public:
     }
     vector<vector<float>> IVF(int nprobe, int k, vector<float> target, int& scanned) {
         scanned = 0;
+
+        if (is_cosine) {
+            float sum = 0;
+            for (int i = 0; i < dimension; i++) {
+                sum += target[i] * target[i];
+            }
+            sum = sqrt(sum);
+            for (int i = 0; i < dimension; i++) {
+                target[i] /= sum;
+            }
+        }
+
         priority_queue<cmp_dist> Max_Centroid;
         int K = vectors_cluster_id.size();
         if (K == 0)
             return vector<vector<float>>();
 
         for (int i = 0; i < K; i++) {
-            float distance = distance_sq(target.data(), centroids.data() + (i * dimension));
+            float distance = 0;
+            if (is_cosine)
+                distance = cosine_sim(target.data(), centroids.data() + (i * dimension));
+            else
+                distance = distance_sq(target.data(), centroids.data() + (i * dimension));
             Max_Centroid.push(cmp_dist(i, distance));
             if (Max_Centroid.size() > nprobe) {
                 Max_Centroid.pop();
@@ -327,7 +424,11 @@ public:
             vector<long long>& cluster = vectors_cluster_id[CentroidID];
             scanned += cluster.size();
             for (int i = 0; i < cluster.size(); i++) {
-                float distance = distance_sq(target.data(), vectors.data()+(cluster[i]*dimension));
+                float distance = 0;
+                if (is_cosine)
+                    distance = cosine_sim(target.data(), norm_vectors.data()+(cluster[i]*dimension));
+                else
+                    distance = distance_sq(target.data(), vectors.data()+(cluster[i]*dimension));
                 Top_k.push(cmp_dist(cluster[i], distance));
                 if (Top_k.size() > k) {
                     Top_k.pop();
