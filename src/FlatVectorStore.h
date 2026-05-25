@@ -116,9 +116,17 @@ public:
                 sum += vec[i] * vec[i];
             }
             sum = sqrt(sum);
-            for (int i = 0; i < dimension; i++)
+            if (sum > 0)
             {
-                norm_vectors[i + idx] = vec[i] / sum;
+                for (int i = 0; i < dimension; i++)
+                {
+                    norm_vectors[i + idx] = vec[i] / sum;
+                }
+            }
+            else {
+                for (int i = 0; i < dimension; i++) {
+                    norm_vectors[i + idx] = 0;
+                }
             }
         }
         else
@@ -132,9 +140,14 @@ public:
                 sum += vec[i] * vec[i];
             }
             sum = sqrt(sum);
-            for (int i = 0; i < dimension; i++)
-            {
-                norm_vectors.push_back(vec[i] / sum);
+            if (sum > 0) {
+                for (int i = 0; i < dimension; i++) {
+                    norm_vectors.push_back(vec[i] / sum);
+                }
+            } else {
+                for (int i = 0; i < dimension; i++) {
+                    norm_vectors.push_back(0);
+                }
             }
         }
         if (!ivf_built)
@@ -193,17 +206,16 @@ public:
     bool k_nearest(const int k, std::vector<float> target,
                    std::vector<std::vector<float>> &k_vectors, std::vector<std::pair<long long, float>> &ids_dis)
     {
-        if (is_cosine)
-        {
+        if (is_cosine) {
             float sum = 0;
-            for (int i = 0; i < dimension; i++)
-            {
+            for (int i = 0; i < dimension; i++) {
                 sum += target[i] * target[i];
             }
-            sum = sqrt(sum);
-            for (int i = 0; i < dimension; i++)
-            {
-                target[i] = target[i] / sum;
+            if (sum > 0) {
+                sum = sqrt(sum);
+                for (int i = 0; i < dimension; i++) {
+                    target[i] /= sum;
+                }
             }
         }
         k_vectors.clear();
@@ -372,9 +384,11 @@ public:
                 }
                 //normalize
                 if (is_cosine) {
-                    norm_sum = sqrt(norm_sum);
-                    for (int dim = 0; dim < dimension; dim++) {
-                        centroids[j * dimension + dim] /= norm_sum;
+                    if (norm_sum > 0) {
+                        norm_sum = sqrt(norm_sum);
+                        for (int dim = 0; dim < dimension; dim++) {
+                            centroids[j * dimension + dim] /= norm_sum;
+                        }
                     }
                 }
             }
@@ -389,18 +403,19 @@ public:
     }
     vector<vector<float>> IVF(int nprobe, int k, vector<float> target, int& scanned) {
         scanned = 0;
-
         if (is_cosine) {
             float sum = 0;
             for (int i = 0; i < dimension; i++) {
                 sum += target[i] * target[i];
             }
-            sum = sqrt(sum);
-            for (int i = 0; i < dimension; i++) {
-                target[i] /= sum;
+            // NEW: Check if sum > 0
+            if (sum > 0.0f) {
+                sum = sqrt(sum);
+                for (int i = 0; i < dimension; i++) {
+                    target[i] /= sum;
+                }
             }
         }
-
         priority_queue<cmp_dist> Max_Centroid;
         int K = vectors_cluster_id.size();
         if (K == 0)
