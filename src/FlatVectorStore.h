@@ -103,6 +103,9 @@ public:
         }
         return v;
     }
+    void set_cosine(bool val) { is_cosine = val; }
+    void set_kpp(bool val) { kpp = val; }
+    void set_multi_probe(bool val) { multi_probe = val; }
     bool insert(const long long id, const std::vector<float> &vec)
     {
         if (vec.size() != dimension)
@@ -336,7 +339,7 @@ public:
                     float distance = 0;
 
                     if (is_cosine)
-                        distance = 1.0f - cosine_sim(latest, current_vector);
+                        distance = cosine_sim(latest, current_vector);
                     else
                         distance = distance_sq(latest, current_vector);
 
@@ -528,12 +531,7 @@ public:
             sorted_centroids.push_back(cmp_dist(i, distance));
         }
 
-        if (is_cosine)
-            sort(sorted_centroids.begin(), sorted_centroids.end(), [](const cmp_dist &a, const cmp_dist &b)
-                 { return a.dist > b.dist; });
-
-        else
-            sort(sorted_centroids.begin(), sorted_centroids.end(), [](const cmp_dist &a, const cmp_dist &b)
+        sort(sorted_centroids.begin(), sorted_centroids.end(), [](const cmp_dist &a, const cmp_dist &b)
                  { return a.dist < b.dist; });
 
         priority_queue<cmp_dist> Top_k;
@@ -543,21 +541,22 @@ public:
         {
             int CentroidID = sorted_centroids[i].id;
             float current_centroid_dist = sorted_centroids[i].dist;
-
-            // If we have already satisfied the minimum nprobe requirement and our top k is full
-            if (probes_counted >= nprobe && Top_k.size() == k)
+            if (probes_counted >= nprobe)
             {
-                float worst_topk_dist = Top_k.top().dist;
-
-                if (!is_cosine)
+                if (multi_probe)
                 {
-                    if (current_centroid_dist > worst_topk_dist)
-                        break;
+                    //break only if the top-k has stabilized
+                    if (Top_k.size() == k)
+                    {
+                        float worst_topk_dist = Top_k.top().dist;
+                        if (current_centroid_dist > worst_topk_dist)
+                            break;
+                    }
                 }
                 else
                 {
-                    if (current_centroid_dist < worst_topk_dist)
-                        break;
+                    //stop right after reaching the nprobe limit
+                    break;
                 }
             }
             probes_counted++;
