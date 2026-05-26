@@ -27,6 +27,8 @@ private:
 
     vector<float> centroids;                      // stores centroid coordinates
     vector<vector<long long>> vectors_cluster_id; // outer vector is clusters, inner vector stores vector index
+    friend bool save_snapshot(FLatVectorStore& store);
+    friend bool load_snapshot(FLatVectorStore& store);
 
     float distance_sq(const float *a, const float *b)
     {

@@ -10,6 +10,7 @@
 #include <mutex>
 #include "FlatVectorStore.h"
 #include "Parser.h"
+#include "Snapshot.h"
 using namespace std;
 
 bool init_flag = true;
@@ -205,11 +206,29 @@ int communication(int ClientSocket, Threader &T, FLatVectorStore &db)
         else if (!(strncmp(command, "SAVE", 4)))
         {
             // [IMPLEMENT SAVE FUNCTIONALITY HERE]
+            mtx.lock();
+            if (save_snapshot(db)) {
+                const char *msg = "OK\n";
+                send(ClientSocket, msg, strlen(msg), 0);
+            } else {
+                const char *msg = "Failed to save snapshot\n";
+                send(ClientSocket, msg, strlen(msg), 0);
+            }
+            mtx.unlock();
             cout << "IN SAVE" << endl;
         }
         else if (!(strncmp(command, "LOAD", 4)))
         {
             // [IMPLEMENT LOAD FUNCTIONALITY HERE]
+            mtx.lock();
+            if (load_snapshot(db)) {
+                const char *msg = "OK\n";
+                send(ClientSocket, msg, strlen(msg), 0);
+            } else {
+                const char *msg = "Failed to load snapshot\n";
+                send(ClientSocket, msg, strlen(msg), 0);
+            }
+            mtx.unlock();
             cout << "IN LOAD" << endl;
         }
         else if (!(strncmp(command, "QUIT", 4)))
@@ -256,6 +275,14 @@ int main()
 {
     const int dim = 4;
     FLatVectorStore db(dim);
+
+    cout << "Loading SNapshot.." << endl;
+    if (load_snapshot(db)) {
+        cout << "Snapshot loaded successfully" << endl;
+    } else {
+        cout << "Snapshot does not exist" << endl;
+    }
+
     // Creating a server socket
     int max = 5;
     int ServerSocket = socket(AF_INET, SOCK_STREAM, 0);
