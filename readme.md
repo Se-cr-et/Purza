@@ -11,9 +11,8 @@ Compile the server, client, and benchmark binaries separately using `make` with 
 Bash
 
 ```
-make sb # Compile
-make sr # Run
-
+make sb #Compile
+make sr #Run
 ```
 
 ### Compile Client
@@ -21,9 +20,8 @@ make sr # Run
 Bash
 
 ```
-make cb # Compile
-make cr # Compile
-
+make cb #Compile
+make cr #Run
 ```
 
 ### Compile Benchmark
@@ -31,9 +29,8 @@ make cr # Compile
 Bash
 
 ```
-make bb # Compile
-make br # Compile
-
+make bb #Compile
+make br #Run
 ```
 
 
