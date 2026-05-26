@@ -323,8 +323,7 @@ public:
                     centroids[j] = vectors[first_centroid * dimension + j];
             }
 
-            // Stores the shortest distance from each data point to centroid
-            vector<float> minimum_distance(number);
+            vector<float> minimum_distance(number, numeric_limits<float>::max());
 
             // Probabilistically choosing the remaining k -1 centroids
             for (int i = 1; i < k; i++)
@@ -402,7 +401,7 @@ public:
         else
             v = vectors.data();
         int iteration;
-        for (iteration = 0; iteration < 50; iteration++)
+        for (iteration = 0; iteration < 200; iteration++)
         {
             bool update_happened = false;
 
@@ -503,8 +502,7 @@ public:
             {
                 sum += target[i] * target[i];
             }
-            // NEW: Check if sum > 0
-            if (sum > 0.0f)
+            if (sum > 0)
             {
                 sum = sqrt(sum);
                 for (int i = 0; i < dimension; i++)
@@ -545,7 +543,6 @@ public:
             {
                 if (multi_probe)
                 {
-                    //break only if the top-k has stabilized
                     if (Top_k.size() == k)
                     {
                         float worst_topk_dist = Top_k.top().dist;
@@ -555,7 +552,6 @@ public:
                 }
                 else
                 {
-                    //stop right after reaching the nprobe limit
                     break;
                 }
             }
@@ -563,21 +559,22 @@ public:
             vector<long long> &cluster = vectors_cluster_id[CentroidID];
             scanned += cluster.size();
 
-            for (size_t i = 0; i < cluster.size(); i++)
+            for (size_t j = 0; j < cluster.size(); j++)
             {
                 float distance = 0;
                 if (is_cosine)
-                    distance = cosine_sim(target.data(), norm_vectors.data() + (cluster[i] * dimension));
+                    distance = cosine_sim(target.data(), norm_vectors.data() + (cluster[j] * dimension));
                 else
-                    distance = distance_sq(target.data(), vectors.data() + (cluster[i] * dimension));
+                    distance = distance_sq(target.data(), vectors.data() + (cluster[j] * dimension));
 
-                Top_k.push(cmp_dist(cluster[i], distance));
+                Top_k.push(cmp_dist(cluster[j], distance));
                 if (Top_k.size() > k)
                 {
                     Top_k.pop();
                 }
             }
         }
+
         int num = Top_k.size();
         if (num == 0)
             return vector<vector<float>>();
@@ -587,7 +584,7 @@ public:
             long long pos = Top_k.top().id;
             nearest[0][i] = ids[pos];
             nearest[1][i] = Top_k.top().dist;
-            cout << "DIST:" << Top_k.top().dist << endl;
+            //cout << "DIST:" << Top_k.top().dist << endl;
             Top_k.pop();
         }
         return nearest;
