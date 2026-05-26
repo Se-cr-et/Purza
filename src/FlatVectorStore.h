@@ -23,7 +23,6 @@ private:
     std::vector<float> norm_vectors;
     std::vector<long long> ids;                         // stores the id for the vector at ith pos
     std::unordered_map<long long, long long> id_to_pos; // maps id to the pos of the vector
-    bool is_cosine;
 
     vector<float> centroids;                      // stores centroid coordinates
     vector<vector<long long>> vectors_cluster_id; // outer vector is clusters, inner vector stores vector index
@@ -67,10 +66,14 @@ private:
             return dist < Other.dist;
         }
     };
+
     bool ivf_built;
+    bool is_cosine; //flag to denote if cosine_sim is used as a distance function
+    bool kpp; //flag to denote if k-means is enabled
+    bool multi_probe;
 
 public:
-    FLatVectorStore(const int dim) : dimension(dim), ivf_built(false), is_cosine(false) {}
+    FLatVectorStore(const int dim) : dimension(dim), ivf_built(false), is_cosine(false), kpp(false), multi_probe(false) {}
     int get_db_size()
     {
         return vectors.size() / dimension;
@@ -306,64 +309,87 @@ public:
         centroids = vector<float>(k * dimension);  // stores centroid coordinates
         vector<int> vector_cluster_id(number, -1); // stores the cluster index of vectors
 
-        long long first_centroid = rand() % number;
-        for (int j = 0; j < dimension; j++)
+        if (kpp)
         {
-            if (is_cosine)
-                centroids[j] = norm_vectors[first_centroid * dimension + j];
-            else
-                centroids[j] = vectors[first_centroid * dimension + j];
-        }
-
-        // Stores the shortest distance from each data point to centroid
-        vector<float> minimum_distance(number);
-
-        // Probabilistically choosing the remaining k -1 centroids
-        for (int i = 1; i < k; i++)
-        {
-            double distance_sum = 0;
-            const float *latest = centroids.data() + ((i - 1) * dimension);
-
-            // updating the distance of all vectors against the lateset centroid
-            for (int j = 0; j < number; j++)
-            {
-                const float *current_vector = is_cosine ? (norm_vectors.data() + (j * dimension)) : (vectors.data() + (j * dimension));
-                float distance = 0;
-
-                if (is_cosine)
-                    distance = 1.0f - cosine_sim(latest, current_vector);
-                else
-                    distance = distance_sq(latest, current_vector);
-
-                // Keep the closest distance found so far
-                if (distance < minimum_distance[j])
-                {
-                    minimum_distance[j] = distance;
-                }
-                distance_sum += minimum_distance[j];
-            }
-
-            float random_target = ((float)rand() / RAND_MAX) * distance_sum;
-            float cumulative_sum = 0.0f;
-            long long picked_position = 0;
-
-            for (int j = 0; j < number; j++)
-            {
-                cumulative_sum += minimum_distance[j];
-                if (cumulative_sum >= random_target)
-                {
-                    picked_position = j;
-                    break;
-                }
-            }
-
-            // Save the chosen vector as the ith centroid
+            long long first_centroid = rand() % number;
             for (int j = 0; j < dimension; j++)
             {
                 if (is_cosine)
-                    centroids[i * dimension + j] = norm_vectors[picked_position * dimension + j];
+                    centroids[j] = norm_vectors[first_centroid * dimension + j];
                 else
-                    centroids[i * dimension + j] = vectors[picked_position * dimension + j];
+                    centroids[j] = vectors[first_centroid * dimension + j];
+            }
+
+            // Stores the shortest distance from each data point to centroid
+            vector<float> minimum_distance(number);
+
+            // Probabilistically choosing the remaining k -1 centroids
+            for (int i = 1; i < k; i++)
+            {
+                double distance_sum = 0;
+                const float *latest = centroids.data() + ((i - 1) * dimension);
+
+                // updating the distance of all vectors against the lateset centroid
+                for (int j = 0; j < number; j++)
+                {
+                    const float *current_vector = is_cosine ? (norm_vectors.data() + (j * dimension)) : (vectors.data() + (j * dimension));
+                    float distance = 0;
+
+                    if (is_cosine)
+                        distance = 1.0f - cosine_sim(latest, current_vector);
+                    else
+                        distance = distance_sq(latest, current_vector);
+
+                    // Keep the closest distance found so far
+                    if (distance < minimum_distance[j])
+                    {
+                        minimum_distance[j] = distance;
+                    }
+                    distance_sum += minimum_distance[j];
+                }
+
+                float random_target = ((float)rand() / RAND_MAX) * distance_sum;
+                float cumulative_sum = 0.0f;
+                long long picked_position = 0;
+
+                for (int j = 0; j < number; j++)
+                {
+                    cumulative_sum += minimum_distance[j];
+                    if (cumulative_sum >= random_target)
+                    {
+                        picked_position = j;
+                        break;
+                    }
+                }
+
+                // Save the chosen vector as the ith centroid
+                for (int j = 0; j < dimension; j++)
+                {
+                    if (is_cosine)
+                        centroids[i * dimension + j] = norm_vectors[picked_position * dimension + j];
+                    else
+                        centroids[i * dimension + j] = vectors[picked_position * dimension + j];
+                }
+            }
+        }
+        else
+        {
+            std::unordered_set<long long> picked_indices;
+            for (long long i = 0; i < k; i++)
+            {
+                long long picked_position;
+                do
+                {
+                    picked_position = rand() % number;
+                } while (picked_indices.find(picked_position) != picked_indices.end());
+                picked_indices.insert(picked_position);
+                for (int j = 0; j < dimension; j++)
+                {
+                    if (is_cosine)
+                        centroids[i * dimension + j] = norm_vectors[picked_position * dimension + j];
+                    else
+                        centroids[i * dimension + j] = vectors[picked_position * dimension + j];
+                }
             }
         }
 
