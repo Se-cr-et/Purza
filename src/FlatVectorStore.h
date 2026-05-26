@@ -306,21 +306,64 @@ public:
         centroids = vector<float>(k * dimension);  // stores centroid coordinates
         vector<int> vector_cluster_id(number, -1); // stores the cluster index of vectors
 
-        // picking k initial centroids
-        unordered_set<int> picked;
-        while (picked.size() < k)
+        long long first_centroid = rand() % number;
+        for (int j = 0; j < dimension; j++)
         {
-            long long random_position = rand() % number;
-            if (picked.insert(random_position).second)
+            if (is_cosine)
+                centroids[j] = norm_vectors[first_centroid * dimension + j];
+            else
+                centroids[j] = vectors[first_centroid * dimension + j];
+        }
+
+        // Stores the shortest distance from each data point to centroid
+        vector<float> minimum_distance(number);
+
+        // Probabilistically choosing the remaining k -1 centroids
+        for (int i = 1; i < k; i++)
+        {
+            double distance_sum = 0;
+            const float *latest = centroids.data() + ((i - 1) * dimension);
+
+            // updating the distance of all vectors against the lateset centroid
+            for (int j = 0; j < number; j++)
             {
-                int i = picked.size() - 1;
-                for (int j = 0; j < dimension; j++)
+                const float *current_vector = is_cosine ? (norm_vectors.data() + (j * dimension)) : (vectors.data() + (j * dimension));
+                float distance = 0;
+
+                if (is_cosine)
+                    distance = 1.0f - cosine_sim(latest, current_vector);
+                else
+                    distance = distance_sq(latest, current_vector);
+
+                // Keep the closest distance found so far
+                if (distance < minimum_distance[j])
                 {
-                    if (is_cosine)
-                        centroids[i * dimension + j] = norm_vectors[random_position * dimension + j];
-                    else
-                        centroids[i * dimension + j] = vectors[random_position * dimension + j];
+                    minimum_distance[j] = distance;
                 }
+                distance_sum += minimum_distance[j];
+            }
+
+            float random_target = ((float)rand() / RAND_MAX) * distance_sum;
+            float cumulative_sum = 0.0f;
+            long long picked_position = 0;
+
+            for (int j = 0; j < number; j++)
+            {
+                cumulative_sum += minimum_distance[j];
+                if (cumulative_sum >= random_target)
+                {
+                    picked_position = j;
+                    break;
+                }
+            }
+
+            // Save the chosen vector as the ith centroid
+            for (int j = 0; j < dimension; j++)
+            {
+                if (is_cosine)
+                    centroids[i * dimension + j] = norm_vectors[picked_position * dimension + j];
+                else
+                    centroids[i * dimension + j] = vectors[picked_position * dimension + j];
             }
         }
 
@@ -441,10 +484,12 @@ public:
                 }
             }
         }
-        priority_queue<cmp_dist> Max_Centroid;
         int K = vectors_cluster_id.size();
         if (K == 0)
             return vector<vector<float>>();
+
+        vector<cmp_dist> sorted_centroids;
+        sorted_centroids.reserve(K);
 
         for (int i = 0; i < K; i++)
         {
@@ -453,26 +498,54 @@ public:
                 distance = cosine_sim(target.data(), centroids.data() + (i * dimension));
             else
                 distance = distance_sq(target.data(), centroids.data() + (i * dimension));
-            Max_Centroid.push(cmp_dist(i, distance));
-            if (Max_Centroid.size() > nprobe)
-            {
-                Max_Centroid.pop();
-            }
+
+            sorted_centroids.push_back(cmp_dist(i, distance));
         }
+
+        if (is_cosine)
+            sort(sorted_centroids.begin(), sorted_centroids.end(), [](const cmp_dist &a, const cmp_dist &b)
+                 { return a.dist > b.dist; });
+
+        else
+            sort(sorted_centroids.begin(), sorted_centroids.end(), [](const cmp_dist &a, const cmp_dist &b)
+                 { return a.dist < b.dist; });
+
         priority_queue<cmp_dist> Top_k;
-        while (!Max_Centroid.empty())
+        int probes_counted = 0;
+
+        for (int i = 0; i < K; i++)
         {
-            int CentroidID = Max_Centroid.top().id;
-            Max_Centroid.pop();
+            int CentroidID = sorted_centroids[i].id;
+            float current_centroid_dist = sorted_centroids[i].dist;
+
+            // If we have already satisfied the minimum nprobe requirement and our top k is full
+            if (probes_counted >= nprobe && Top_k.size() == k)
+            {
+                float worst_topk_dist = Top_k.top().dist;
+
+                if (!is_cosine)
+                {
+                    if (current_centroid_dist > worst_topk_dist)
+                        break;
+                }
+                else
+                {
+                    if (current_centroid_dist < worst_topk_dist)
+                        break;
+                }
+            }
+            probes_counted++;
             vector<long long> &cluster = vectors_cluster_id[CentroidID];
             scanned += cluster.size();
-            for (int i = 0; i < cluster.size(); i++)
+
+            for (size_t i = 0; i < cluster.size(); i++)
             {
                 float distance = 0;
                 if (is_cosine)
                     distance = cosine_sim(target.data(), norm_vectors.data() + (cluster[i] * dimension));
                 else
                     distance = distance_sq(target.data(), vectors.data() + (cluster[i] * dimension));
+
                 Top_k.push(cmp_dist(cluster[i], distance));
                 if (Top_k.size() > k)
                 {
